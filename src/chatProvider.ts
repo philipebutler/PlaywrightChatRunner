@@ -74,13 +74,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const token = cts.token;
       // Build system prompt
       const toolDescriptions = this._buildToolDescriptions();
+      const noToolsEnabled = this._enabledTools.length === 0;
       const systemPrompt =
         'You are a Playwright automation assistant.\n' +
         'You MUST return ONLY valid JSON in this exact format: { "steps": [ ... ] }\n' +
         'If you need clarification, return: { "clarification": "your question here" }\n' +
         'Do NOT assume missing information. Ask before proceeding if unsure.\n' +
-        `Available tools:\n${toolDescriptions}\n` +
-        'ONLY use tools from the available list above.';
+        (noToolsEnabled
+          ? 'No tools are currently enabled. You MUST return a clarification asking the user to enable tools before proceeding.\n'
+          : `Available tools:\n${toolDescriptions}\n` +
+            'ONLY use tools from the available list above.');
 
       const response = await this._callLLM(systemPrompt, text, token);
 
@@ -111,8 +114,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      // Validate action plan
-      const enabledTools: string[] = this._enabledTools.length > 0 ? this._enabledTools : [...AVAILABLE_TOOLS];
+      // Validate action plan using only explicitly enabled tools
+      const enabledTools: string[] = [...this._enabledTools];
       const validation = validateActionPlan(parsed, enabledTools);
 
       if (!validation.valid || !validation.plan) {
@@ -193,7 +196,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private _buildToolDescriptions(): string {
-    const tools = this._enabledTools.length > 0 ? this._enabledTools : AVAILABLE_TOOLS;
+    const tools = [...this._enabledTools];
     const descriptions: Record<string, string> = {
       goto: 'goto: { "action": "goto", "url": "<string>" } - Navigate to a URL',
       clickText: 'clickText: { "action": "clickText", "text": "<string>" } - Click element by visible text',
@@ -219,7 +222,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      const content = fs.readFileSync(uris[0].fsPath, 'utf8');
+      const fileData = await vscode.workspace.fs.readFile(uris[0]);
+      const content = Buffer.from(fileData).toString('utf8');
       this._view?.webview.postMessage({ type: 'loadedFile', text: content });
       // Also process as a submit
       await this._handleSubmit(content);
@@ -251,7 +255,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           lines.push(`## Execution Result\n\n\`\`\`json\n${JSON.stringify(entry.result, null, 2)}\n\`\`\`\n`);
         }
       }
-      fs.writeFileSync(uri.fsPath, lines.join('\n'), 'utf8');
+      await vscode.workspace.fs.writeFile(uri, Buffer.from(lines.join('\n'), 'utf8'));
       vscode.window.showInformationMessage(`Results exported to ${uri.fsPath}`);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);

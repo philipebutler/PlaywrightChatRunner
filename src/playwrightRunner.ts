@@ -55,6 +55,14 @@ export class PlaywrightRunner {
           if (!step.url) {
             return { action: step.action, success: false, error: '"url" is required for goto' };
           }
+          try {
+            const parsed = new URL(step.url);
+            if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+              return { action: step.action, success: false, error: `Only http and https URLs are allowed, got "${parsed.protocol}"` };
+            }
+          } catch {
+            return { action: step.action, success: false, error: `Invalid URL: "${step.url}"` };
+          }
           await page.goto(step.url, { timeout: 30000 });
           return { action: step.action, success: true };
 
@@ -82,7 +90,8 @@ export class PlaywrightRunner {
         }
 
         case 'screenshot': {
-          const screenshotPath = path.join(os.tmpdir(), `${step.name!}.png`);
+          const safeName = path.basename(step.name!).replace(/[^a-zA-Z0-9_-]/g, '_');
+          const screenshotPath = path.join(os.tmpdir(), `${safeName}.png`);
           await page.screenshot({ path: screenshotPath, timeout: 10000 });
           return { action: step.action, success: true, data: screenshotPath };
         }
