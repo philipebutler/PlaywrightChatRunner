@@ -52,7 +52,10 @@ export class PlaywrightRunner {
     try {
       switch (step.action) {
         case 'goto':
-          await page.goto(step.url!, { timeout: 30000 });
+          if (!step.url) {
+            return { action: step.action, success: false, error: '"url" is required for goto' };
+          }
+          await page.goto(step.url, { timeout: 30000 });
           return { action: step.action, success: true };
 
         case 'clickText':

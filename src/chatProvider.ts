@@ -69,9 +69,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this._chatHistory.push({ role: 'user', text });
     this._view.webview.postMessage({ type: 'userMessage', text });
 
-    const token = new vscode.CancellationTokenSource().token;
-
+    const cts = new vscode.CancellationTokenSource();
     try {
+      const token = cts.token;
       // Build system prompt
       const toolDescriptions = this._buildToolDescriptions();
       const systemPrompt =
@@ -112,7 +112,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
 
       // Validate action plan
-      const enabledTools = this._enabledTools.length > 0 ? this._enabledTools : AVAILABLE_TOOLS.slice();
+      const enabledTools: string[] = this._enabledTools.length > 0 ? this._enabledTools : [...AVAILABLE_TOOLS];
       const validation = validateActionPlan(parsed, enabledTools);
 
       if (!validation.valid || !validation.plan) {
@@ -149,6 +149,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const errorMsg = err instanceof Error ? err.message : String(err);
       this._chatHistory.push({ role: 'llm', text: `Error: ${errorMsg}` });
       this._view?.webview.postMessage({ type: 'error', text: errorMsg });
+    } finally {
+      cts.dispose();
     }
   }
 
@@ -191,7 +193,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private _buildToolDescriptions(): string {
-    const tools = this._enabledTools.length > 0 ? this._enabledTools : AVAILABLE_TOOLS.slice();
+    const tools = this._enabledTools.length > 0 ? this._enabledTools : AVAILABLE_TOOLS;
     const descriptions: Record<string, string> = {
       goto: 'goto: { "action": "goto", "url": "<string>" } - Navigate to a URL',
       clickText: 'clickText: { "action": "clickText", "text": "<string>" } - Click element by visible text',
