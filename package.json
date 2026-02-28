@@ -1,0 +1,53 @@
+{
+  "name": "playwright-chat-runner",
+  "displayName": "Playwright Chat Runner",
+  "description": "Chat-style UI for running Playwright browser automation driven by Copilot",
+  "version": "0.0.1",
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Other"],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "playwrightChatRunner.open",
+        "title": "Open Playwright Chat Runner"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "playwrightChatRunner",
+          "title": "Playwright Chat Runner",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "playwrightChatRunner": [
+        {
+          "type": "webview",
+          "id": "playwrightChatRunner.chatView",
+          "name": "Chat"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "dependencies": {
+    "playwright": "^1.44.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0"
+  }
+}
