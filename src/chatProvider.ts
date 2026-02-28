@@ -72,18 +72,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const cts = new vscode.CancellationTokenSource();
     try {
       const token = cts.token;
+
+      // Early exit when no tools are enabled
+      if (this._enabledTools.length === 0) {
+        const noToolsMsg = 'No tools are currently enabled. Please enable at least one tool in the "Enabled Tools" panel before submitting a command.';
+        this._chatHistory.push({ role: 'llm', text: noToolsMsg });
+        this._view.webview.postMessage({ type: 'error', text: noToolsMsg });
+        return;
+      }
+
       // Build system prompt
       const toolDescriptions = this._buildToolDescriptions();
-      const noToolsEnabled = this._enabledTools.length === 0;
       const systemPrompt =
         'You are a Playwright automation assistant.\n' +
         'You MUST return ONLY valid JSON in this exact format: { "steps": [ ... ] }\n' +
         'If you need clarification, return: { "clarification": "your question here" }\n' +
         'Do NOT assume missing information. Ask before proceeding if unsure.\n' +
-        (noToolsEnabled
-          ? 'No tools are currently enabled. You MUST return a clarification asking the user to enable tools before proceeding.\n'
-          : `Available tools:\n${toolDescriptions}\n` +
-            'ONLY use tools from the available list above.');
+        `Available tools:\n${toolDescriptions}\n` +
+        'ONLY use tools from the available list above.';
 
       const response = await this._callLLM(systemPrompt, text, token);
 
@@ -223,7 +229,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     try {
       const fileData = await vscode.workspace.fs.readFile(uris[0]);
-      const content = Buffer.from(fileData).toString('utf8');
+      const content = new TextDecoder().decode(fileData);
       this._view?.webview.postMessage({ type: 'loadedFile', text: content });
       // Also process as a submit
       await this._handleSubmit(content);
@@ -255,7 +261,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           lines.push(`## Execution Result\n\n\`\`\`json\n${JSON.stringify(entry.result, null, 2)}\n\`\`\`\n`);
         }
       }
-      await vscode.workspace.fs.writeFile(uri, Buffer.from(lines.join('\n'), 'utf8'));
+      await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(lines.join('\n')));
       vscode.window.showInformationMessage(`Results exported to ${uri.fsPath}`);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
