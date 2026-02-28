@@ -72,6 +72,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const cts = new vscode.CancellationTokenSource();
     try {
       const token = cts.token;
+
+      // Early exit when no tools are enabled
+      if (this._enabledTools.length === 0) {
+        const noToolsMsg = 'No tools are currently enabled. Please enable at least one tool in the "Enabled Tools" panel before submitting a command.';
+        this._chatHistory.push({ role: 'llm', text: noToolsMsg });
+        this._view.webview.postMessage({ type: 'error', text: noToolsMsg });
+        return;
+      }
+
       // Build system prompt
       const toolDescriptions = this._buildToolDescriptions();
       const systemPrompt =
@@ -111,8 +120,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      // Validate action plan
-      const enabledTools: string[] = this._enabledTools.length > 0 ? this._enabledTools : [...AVAILABLE_TOOLS];
+      // Validate action plan using only explicitly enabled tools
+      const enabledTools: string[] = [...this._enabledTools];
       const validation = validateActionPlan(parsed, enabledTools);
 
       if (!validation.valid || !validation.plan) {
@@ -193,7 +202,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private _buildToolDescriptions(): string {
-    const tools = this._enabledTools.length > 0 ? this._enabledTools : AVAILABLE_TOOLS;
+    const tools = [...this._enabledTools];
     const descriptions: Record<string, string> = {
       goto: 'goto: { "action": "goto", "url": "<string>" } - Navigate to a URL',
       clickText: 'clickText: { "action": "clickText", "text": "<string>" } - Click element by visible text',
@@ -219,7 +228,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      const content = fs.readFileSync(uris[0].fsPath, 'utf8');
+      const fileData = await vscode.workspace.fs.readFile(uris[0]);
+      const content = new TextDecoder().decode(fileData);
       this._view?.webview.postMessage({ type: 'loadedFile', text: content });
       // Also process as a submit
       await this._handleSubmit(content);
@@ -251,7 +261,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           lines.push(`## Execution Result\n\n\`\`\`json\n${JSON.stringify(entry.result, null, 2)}\n\`\`\`\n`);
         }
       }
-      fs.writeFileSync(uri.fsPath, lines.join('\n'), 'utf8');
+      await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(lines.join('\n')));
       vscode.window.showInformationMessage(`Results exported to ${uri.fsPath}`);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);

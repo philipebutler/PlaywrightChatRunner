@@ -37,7 +37,8 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src --ext ts",
+    "test": "tsc -p ./ && node --test out/actionDsl.test.js"
   },
   "dependencies": {
     "playwright": "^1.44.0"
